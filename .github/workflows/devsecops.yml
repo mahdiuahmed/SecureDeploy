@@ -114,17 +114,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build image
         run: docker build -t securedeploy-app:${{ github.sha }} .
-      - name: Trivy scan (table output)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: securedeploy-app:${{ github.sha }}
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code:
-            0
-            # Don't fail build yet, just report. We'll fail in the SARIF step to get better reporting in GitHub UI.
-            # This also allows the Slack notification to go out on the first run of the pipeline, even if there are pre-existing vulnerabilities.
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:

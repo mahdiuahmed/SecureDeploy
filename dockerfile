@@ -1,6 +1,9 @@
 # ─── Stage 1: Build dependencies ───
 FROM python:3.12-slim AS builder
 
+# Patch OS packages to clear Trivy HIGH/CRITICAL CVEs (unfixed base image vulns)
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
 
 # Install build deps only in builder stage
