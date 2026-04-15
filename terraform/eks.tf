@@ -66,9 +66,10 @@ resource "aws_eks_cluster" "main" {
   vpc_config {
     subnet_ids              = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     endpoint_private_access = true
-    endpoint_public_access  = true # set false for prod (VPN/bastion required)
-    public_access_cidrs     = ["0.0.0.0/0"]
+    endpoint_public_access  = false
   }
+
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   # Encrypt k8s secrets at rest using AWS-managed key
   encryption_config {

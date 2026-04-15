@@ -38,7 +38,7 @@ data "aws_caller_identity" "current" {}
 # ─────────────────────────────────────────
 resource "aws_ecr_repository" "app" {
   name                 = "${var.project_name}-app"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   # Scan images automatically on push (AWS native scanning)
   image_scanning_configuration {
@@ -191,6 +191,10 @@ resource "aws_lambda_function" "posture_monitor" {
       SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
       PROJECT_NAME  = var.project_name
     }
+  }
+
+  tracing_config {
+    mode = "Active"
   }
 
   tags = {

@@ -19,7 +19,7 @@ resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = { Name = "${var.project_name}-public-a" }
 }
@@ -220,6 +220,8 @@ resource "aws_db_instance" "main" {
 
   backup_retention_period = 7
   backup_window           = "02:00-03:00"
+
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 
   tags = { Name = "${var.project_name}-db" }
 }
