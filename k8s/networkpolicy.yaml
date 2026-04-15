@@ -1,0 +1,36 @@
+# NetworkPolicy — whitelist-only ingress/egress for the securedeploy pod.
+# Demonstrates: Attack Surface Minimization, Least Functionality, Zero Trust.
+#
+# Ingress: only port 8080 (app HTTP)
+# Egress:  only port 443 (HTTPS — ECR pulls, AWS API calls)
+#          DNS (port 53 UDP/TCP) is always required for k8s service resolution
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: securedeploy-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: securedeploy
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # HTTPS — AWS APIs, ECR, SNS
+    - ports:
+        - protocol: TCP
+          port: 443
+    # DNS — required for k8s service discovery
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

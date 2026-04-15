@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Terraform state — use remote backend
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform/.terraform/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Lambda build artefact
+lambda/posture.zip
+
+# OS
+.DS_Store

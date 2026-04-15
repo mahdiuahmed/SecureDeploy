@@ -1,0 +1,8 @@
+.git
+.github
+terraform
+lambda
+*.md
+__pycache__
+.venv
+.env
