@@ -15,7 +15,7 @@ provider "aws" {
 }
 
 variable "aws_region" {
-  default     = "eu-west-1"
+  default     = "eu-west-2"
   description = "AWS region"
 }
 
@@ -90,7 +90,7 @@ resource "aws_sns_topic" "alerts" {
 resource "aws_sns_topic_subscription" "email" {
   topic_arn = aws_sns_topic.alerts.arn
   protocol  = "email"
-  endpoint  = "imahdiahmed01@gmail.com"  # Confirm via link in inbox
+  endpoint  = "imahdiahmed01@gmail.com" # Confirm via link in inbox
 }
 
 # ─────────────────────────────────────────
@@ -284,7 +284,7 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
         Sid    = "EKSDeploy"
         Effect = "Allow"
         Action = [
-          "eks:DescribeCluster"   # required for aws eks update-kubeconfig
+          "eks:DescribeCluster" # required for aws eks update-kubeconfig
         ]
         Resource = aws_eks_cluster.main.arn
       }
