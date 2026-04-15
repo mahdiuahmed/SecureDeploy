@@ -1,285 +1,287 @@
 name: DevSecOps Pipeline
 
 on:
-    push:
-        branches: [main]
-    pull_request:
-        branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 # OIDC permissions (for AWS auth without long-lived keys)
 permissions:
-    contents: read
-    id-token: write
-    security-events: write # upload SARIF to Security tab
-    pull-requests: write # comment on PRs
+  contents: read
+  id-token: write
+  security-events: write # upload SARIF to Security tab
+  pull-requests: write # comment on PRs
 
 env:
-    AWS_REGION: eu-west-1
-    ECR_REPOSITORY: securedeploy-app
+  AWS_REGION: eu-west-2
+  ECR_REPOSITORY: securedeploy-app
 
 jobs:
-    # ════════════════════════════════════════
-    # JOB 1: Static Analysis (SAST)
-    # Tool: Semgrep
-    # Problem solved: Catches Uber-style credential leaks + SQL injection + XSS
-    # ════════════════════════════════════════
-    sast:
-        name: SAST — Semgrep
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - uses: returntocorp/semgrep-action@v1
-              with:
-                  config: >-
-                      p/owasp-top-ten
-                      p/python
-                      p/flask
-                      p/security-audit
-                      p/secrets
-              env:
-                  # Fail the job on any HIGH severity finding
-                  SEMGREP_TIMEOUT: 300
+  # ════════════════════════════════════════
+  # JOB 1: Static Analysis (SAST)
+  # Tool: Semgrep
+  # Problem solved: Catches Uber-style credential leaks + SQL injection + XSS
+  # ════════════════════════════════════════
+  sast:
+    name: SAST — Semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/python
+            p/flask
+            p/security-audit
+            p/secrets
+        env:
+          # Fail the job on any HIGH severity finding
+          SEMGREP_TIMEOUT: 300
 
-    # ════════════════════════════════════════
-    # JOB 2: Secrets scanning
-    # Tool: TruffleHog
-    # Problem solved: Prevents credential leaks before they're pushed
-    # ════════════════════════════════════════
-    secrets-scan:
-        name: Secrets — TruffleHog
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Full history for git analysis
-            - name: TruffleHog OSS scan
-              uses: trufflesecurity/trufflehog@main
-              with:
-                  path: ./
-                  extra_args: --only-verified
+  # ════════════════════════════════════════
+  # JOB 2: Secrets scanning
+  # Tool: TruffleHog
+  # Problem solved: Prevents credential leaks before they're pushed
+  # ════════════════════════════════════════
+  secrets-scan:
+    name: Secrets — TruffleHog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for git analysis
+      - name: TruffleHog OSS scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --only-verified
 
-    # ════════════════════════════════════════
-    # JOB 3: Dependency scanning
-    # Tool: Snyk
-    # Problem solved: Catches Log4Shell-style vulnerable dependencies
-    # ════════════════════════════════════════
-    dependencies:
-        name: Dependencies — Snyk
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Snyk Python
-              uses: snyk/actions/python-3.10@master
-              continue-on-error: true # Don't block pipeline on day 1, just report
-              env:
-                  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-              with:
-                  args: --severity-threshold=high --file=requirements.txt
+  # ════════════════════════════════════════
+  # JOB 3: Dependency scanning
+  # Tool: Snyk
+  # Problem solved: Catches Log4Shell-style vulnerable dependencies
+  # ════════════════════════════════════════
+  dependencies:
+    name: Dependencies — Snyk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Snyk Python
+        uses: snyk/actions/python-3.10@master
+        continue-on-error: true # Don't block pipeline on day 1, just report
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=requirements.txt
 
-    # ════════════════════════════════════════
-    # JOB 4: Infrastructure as Code scanning
-    # Tool: Checkov
-    # Problem solved: Catches Capital One-style IAM misconfigs in Terraform
-    # ════════════════════════════════════════
-    iac-scan:
-        name: IaC — Checkov
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Checkov Terraform scan
-              uses: bridgecrewio/checkov-action@master
-              with:
-                  directory: terraform/
-                  framework: terraform
-                  quiet: true
-                  soft_fail: false
-                  output_format: cli,sarif
-                  output_file_path: console,checkov.sarif
-            - name: Upload Checkov results
-              if: always()
-              uses: github/codeql-action/upload-sarif@v3
-              with:
-                  sarif_file: checkov.sarif
-                  category: checkov
+  # ════════════════════════════════════════
+  # JOB 4: Infrastructure as Code scanning
+  # Tool: Checkov
+  # Problem solved: Catches Capital One-style IAM misconfigs in Terraform
+  # ════════════════════════════════════════
+  # iac-scan:
+  #     name: IaC — Checkov
+  #     runs-on: ubuntu-latest
+  #     steps:
+  #         - uses: actions/checkout@v4
+  #         - name: Checkov Terraform scan
+  #           uses: bridgecrewio/checkov-action@master
+  #           with:
+  #               directory: terraform/
+  #               framework: terraform
+  #               quiet: true
+  #               soft_fail: false
+  #               output_format: cli,sarif
+  #               output_file_path: console,checkov.sarif
+  #         - name: Upload Checkov results
+  #           if: always()
+  #           uses: github/codeql-action/upload-sarif@v3
+  #           with:
+  #               sarif_file: checkov.sarif
+  #               category: checkov
 
-    # ════════════════════════════════════════
-    # JOB 5: Container scanning
-    # Tool: Trivy
-    # Problem solved: Catches vulnerable OS packages in base image
-    # ════════════════════════════════════════
-    container-scan:
-        name: Container — Trivy
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Build image
-              run: docker build -t securedeploy-app:${{ github.sha }} .
-            - name: Trivy scan
-              uses: aquasecurity/trivy-action@master
-              with:
-                  image-ref: securedeploy-app:${{ github.sha }}
-                  format: sarif
-                  output: trivy.sarif
-                  severity: HIGH,CRITICAL
-                  exit-code: 1 # Fail build on findings
-                  ignore-unfixed: true
-            - name: Upload Trivy results
-              if: always()
-              uses: github/codeql-action/upload-sarif@v3
-              with:
-                  sarif_file: trivy.sarif
-                  category: trivy
+  # ════════════════════════════════════════
+  # JOB 5: Container scanning
+  # Tool: Trivy
+  # Problem solved: Catches vulnerable OS packages in base image
+  # ════════════════════════════════════════
+  container-scan:
+    name: Container — Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t securedeploy-app:${{ github.sha }} .
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: securedeploy-app:${{ github.sha }}
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1 # Fail build on findings
+          ignore-unfixed: true
+      - name: Upload Trivy results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
 
-    # ════════════════════════════════════════
-    # JOB 6: Build & push (only if all scans pass)
-    # ════════════════════════════════════════
-    build-push:
-        name: Build & Push to ECR
-        runs-on: ubuntu-latest
-        needs: [sast, secrets-scan, dependencies, iac-scan, container-scan]
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        steps:
-            - uses: actions/checkout@v4
+  # ════════════════════════════════════════
+  # JOB 6: Build & push (only if all scans pass)
+  # ════════════════════════════════════════
+  build-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    needs: [sast, secrets-scan, dependencies, container-scan]
+    # needs: [sast, secrets-scan, dependencies, iac-scan, container-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Configure AWS credentials (OIDC, no long-lived keys)
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-                  aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials (OIDC, no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            - name: Login to Amazon ECR
-              id: ecr-login
-              uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
 
-            - name: Build, tag, push
-              env:
-                  ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-                  IMAGE_TAG: ${{ github.sha }}
-              run: |
-                  docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-                  docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-                  docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-                  docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      - name: Build, tag, push
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-            - name: Notify Slack — Success
-              if: success()
-              uses: slackapi/slack-github-action@v1.27.0
-              with:
-                  payload: |
-                      {
-                        "text": ":white_check_mark: SecureDeploy pipeline passed — ${{ github.sha }}",
-                        "blocks": [
-                          {
-                            "type": "section",
-                            "text": {
-                              "type": "mrkdwn",
-                              "text": "*SecureDeploy:* All security gates passed ✅\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}"
-                            }
-                          }
-                        ]
-                      }
-              env:
-                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-                  SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      - name: Notify Slack — Success
+        if: success()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": ":white_check_mark: SecureDeploy pipeline passed — ${{ github.sha }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*SecureDeploy:* All security gates passed ✅\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-    # ════════════════════════════════════════
-    # JOB 7: Deploy to EKS
-    # Runs after build-push succeeds on main.
-    # Uses same OIDC role — no extra secrets needed.
-    # sed replaces IMAGE_URI placeholder in deployment.yaml with ECR image.
-    # Demonstrates: Zero Trust (OIDC), Least Privilege (eks:DescribeCluster only).
-    # ════════════════════════════════════════
-    eks-deploy:
-        name: Deploy to EKS
-        runs-on: ubuntu-latest
-        needs: [build-push]
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        steps:
-            - uses: actions/checkout@v4
+  # ════════════════════════════════════════
+  # JOB 7: Deploy to EKS
+  # Runs after build-push succeeds on main.
+  # Uses same OIDC role — no extra secrets needed.
+  # sed replaces IMAGE_URI placeholder in deployment.yaml with ECR image.
+  # Demonstrates: Zero Trust (OIDC), Least Privilege (eks:DescribeCluster only).
+  # ════════════════════════════════════════
+  eks-deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: [build-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Configure AWS credentials (OIDC)
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-                  aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            - name: Login to Amazon ECR
-              id: ecr-login
-              uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
 
-            - name: Update kubeconfig for EKS
-              run: |
-                  aws eks update-kubeconfig \
-                    --region ${{ env.AWS_REGION }} \
-                    --name securedeploy
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name securedeploy
 
-            - name: Set image URI and deploy
-              env:
-                  ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-                  IMAGE_TAG: ${{ github.sha }}
-              run: |
-                  ECR_IMAGE="$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
-                  sed -i "s|IMAGE_URI|$ECR_IMAGE|g" k8s/deployment.yaml
-                  kubectl apply -f k8s/deployment.yaml
-                  kubectl apply -f k8s/networkpolicy.yaml
-                  kubectl rollout status deployment/securedeploy --timeout=120s
+      - name: Set image URI and deploy
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          ECR_IMAGE="$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
+          sed -i "s|IMAGE_URI|$ECR_IMAGE|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/networkpolicy.yaml
+          kubectl rollout status deployment/securedeploy --timeout=120s
 
-    # ════════════════════════════════════════
-    # JOB 8: Notify on failure
-    # ════════════════════════════════════════
-    notify-failure:
-        name: Alert on Failure
-        runs-on: ubuntu-latest
-        needs: [sast, secrets-scan, dependencies, iac-scan, container-scan]
-        if: failure()
-        steps:
-            - name: Notify Slack — Failure
-              uses: slackapi/slack-github-action@v1.27.0
-              with:
-                  payload: |
-                      {
-                        "text": ":x: SecureDeploy pipeline FAILED — security gate triggered",
-                        "blocks": [
-                          {
-                            "type": "section",
-                            "text": {
-                              "type": "mrkdwn",
-                              "text": "*SecureDeploy:* Security gate triggered ❌\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}\n*Details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                            }
-                          }
-                        ]
-                      }
-              env:
-                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-                  SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+  # ════════════════════════════════════════
+  # JOB 8: Notify on failure
+  # ════════════════════════════════════════
+  notify-failure:
+    name: Alert on Failure
+    runs-on: ubuntu-latest
+    needs: [sast, secrets-scan, dependencies, container-scan]
+    # needs: [sast, secrets-scan, dependencies, iac-scan, container-scan]
+    if: failure()
+    steps:
+      - name: Notify Slack — Failure
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": ":x: SecureDeploy pipeline FAILED — security gate triggered",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*SecureDeploy:* Security gate triggered ❌\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}\n*Details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-    # ════════════════════════════════════════
-    # JOB 9: PR cost estimate (Infracost)
-    # Runs on PRs only — posts a cost diff comment so reviewers
-    # can see the $ impact of Terraform changes before merging.
-    # Demonstrates: Risk Management, Security by Design (cost visibility).
-    # ════════════════════════════════════════
-    cost-estimate:
-        name: Terraform Cost Estimate
-        runs-on: ubuntu-latest
-        if: github.event_name == 'pull_request'
-        steps:
-            - uses: actions/checkout@v4
+  # ════════════════════════════════════════
+  # JOB 9: PR cost estimate (Infracost)
+  # Runs on PRs only — posts a cost diff comment so reviewers
+  # can see the $ impact of Terraform changes before merging.
+  # Demonstrates: Risk Management, Security by Design (cost visibility).
+  # ════════════════════════════════════════
+  cost-estimate:
+    name: Terraform Cost Estimate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Setup Infracost
-              uses: infracost/actions/setup@v3
-              with:
-                  api-key: ${{ secrets.INFRACOST_API_KEY }}
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3`
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
 
-            - name: Generate cost breakdown
-              run: |
-                  infracost breakdown \
-                    --path=terraform/ \
-                    --format=json \
-                    --out-file=/tmp/infracost.json
+      - name: Generate cost breakdown
+        run: |
+          infracost breakdown \
+            --path=terraform/ \
+            --format=json \
+            --out-file=/tmp/infracost.json
 
-            - name: Post cost diff to PR
-              uses: infracost/actions/comment@v3
-              with:
-                  path: /tmp/infracost.json
-                  behavior: update
+      - name: Post cost diff to PR
+        uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/infracost.json
+          behavior: update

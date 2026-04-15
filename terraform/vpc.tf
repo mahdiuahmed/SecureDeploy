@@ -204,7 +204,7 @@ resource "aws_db_instance" "main" {
   instance_class    = "db.t3.micro"
   allocated_storage = 20
   storage_type      = "gp2"
-  storage_encrypted = true   # CIS Benchmark: encryption at rest
+  storage_encrypted = true # CIS Benchmark: encryption at rest
 
   db_name  = "securedeploy"
   username = "sdadmin"
@@ -213,10 +213,10 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.db.id]
 
-  multi_az               = false   # set true for prod HA
-  publicly_accessible    = false   # never expose DB to internet
-  deletion_protection    = false   # set true for prod
-  skip_final_snapshot    = true    # set false for prod
+  multi_az            = false # set true for prod HA
+  publicly_accessible = false # never expose DB to internet
+  deletion_protection = false # set true for prod
+  skip_final_snapshot = true  # set false for prod
 
   backup_retention_period = 7
   backup_window           = "02:00-03:00"
