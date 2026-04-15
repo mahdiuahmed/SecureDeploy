@@ -78,12 +78,49 @@ resource "aws_route_table_association" "public_b" {
   route_table_id = aws_route_table.public.id
 }
 
+# ── NAT Gateway (private subnets need outbound for EKS bootstrap + ECR) ───────
+
+resource "aws_eip" "nat" {
+  domain     = "vpc"
+  depends_on = [aws_internet_gateway.main]
+
+  tags = { Name = "${var.project_name}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_a.id
+
+  tags = { Name = "${var.project_name}-nat" }
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+
+  tags = { Name = "${var.project_name}-private-rt" }
+}
+
+resource "aws_route_table_association" "private_a" {
+  subnet_id      = aws_subnet.private_a.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = aws_subnet.private_b.id
+  route_table_id = aws_route_table.private.id
+}
+
 # ── Security Groups ───────────────────────────────────────────────────────────
 
 # App tier: accepts HTTPS from internet, egress to DB only on 5432.
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-app-sg"
-  description = "App tier — inbound HTTPS only, outbound to DB"
+  description = "App tier - inbound HTTPS only, outbound to DB"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -103,14 +140,6 @@ resource "aws_security_group" "app" {
   }
 
   egress {
-    description     = "PostgreSQL to DB tier only"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.db.id]
-  }
-
-  egress {
     description = "HTTPS out (ECR, SNS, AWS APIs)"
     from_port   = 443
     to_port     = 443
@@ -124,16 +153,8 @@ resource "aws_security_group" "app" {
 # DB tier: accepts PostgreSQL from app-sg only — no direct internet access.
 resource "aws_security_group" "db" {
   name        = "${var.project_name}-db-sg"
-  description = "DB tier — inbound PostgreSQL from app-sg only"
+  description = "DB tier - inbound PostgreSQL from app-sg only"
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "PostgreSQL from app tier only"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app.id]
-  }
 
   egress {
     description = "No outbound"
@@ -144,6 +165,27 @@ resource "aws_security_group" "db" {
   }
 
   tags = { Name = "${var.project_name}-db-sg" }
+}
+
+# Standalone cross-SG rules — avoids the cycle that inline rules create
+resource "aws_security_group_rule" "app_to_db" {
+  type                     = "egress"
+  description              = "PostgreSQL to DB tier only"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.app.id
+  source_security_group_id = aws_security_group.db.id
+}
+
+resource "aws_security_group_rule" "db_from_app" {
+  type                     = "ingress"
+  description              = "PostgreSQL from app tier only"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.db.id
+  source_security_group_id = aws_security_group.app.id
 }
 
 # ── RDS (PostgreSQL, encrypted, private subnets) ──────────────────────────────
