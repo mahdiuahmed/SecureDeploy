@@ -10,6 +10,9 @@ RUN pip install --user --no-cache-dir --no-warn-script-location -r requirements.
 # ─── Stage 2: Runtime ───
 FROM python:3.12-slim AS runtime
 
+# Patch OS packages to clear Trivy HIGH/CRITICAL CVEs (unfixed base image vulns)
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user (defence-in-depth)
 RUN groupadd -r app && useradd -r -g app -u 1000 app
 
