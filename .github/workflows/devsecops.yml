@@ -121,7 +121,7 @@ jobs:
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: 0 # don't fail here, fail on SARIF step
+          exit-code: 1 # don't fail here, fail on SARIF step
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -129,7 +129,7 @@ jobs:
           format: sarif
           output: trivy.sarif
           severity: HIGH,CRITICAL
-          exit-code: 1 # Fail build on findings
+          exit-code: 0 # Fail build on findings
           ignore-unfixed: true
 
       - name: Upload Trivy results
