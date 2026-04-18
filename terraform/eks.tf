@@ -66,7 +66,7 @@ resource "aws_eks_cluster" "main" {
   vpc_config {
     subnet_ids              = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     endpoint_private_access = true
-    endpoint_public_access  = false
+    endpoint_public_access  = true   # required for GitHub Actions public runners to deploy
   }
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
