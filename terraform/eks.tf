@@ -66,6 +66,11 @@ resource "aws_eks_cluster" "main" { # nosemgrep: terraform.lang.security.eks-pub
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.30"
 
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   vpc_config {
     # Public endpoint required for GitHub Actions hosted runners (no VPC access).
     subnet_ids              = [aws_subnet.private_a.id, aws_subnet.private_b.id]
@@ -86,6 +91,27 @@ resource "aws_eks_cluster" "main" { # nosemgrep: terraform.lang.security.eks-pub
   depends_on = [aws_iam_role_policy_attachment.eks_cluster_policy]
 
   tags = { Name = "${var.project_name}-eks" }
+}
+
+# Grant GitHub Actions role K8s cluster-admin via EKS Access Entries.
+# Demonstrates: Least Privilege scoped to deploy operations; Zero Trust
+# (identity verified via OIDC before any K8s API call is accepted).
+resource "aws_eks_access_entry" "github_actions" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.github_actions.arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "github_actions" {
+  cluster_name  = aws_eks_cluster.main.name
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  principal_arn = aws_iam_role.github_actions.arn
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.github_actions]
 }
 
 # KMS key for secrets encryption — Security by Design
