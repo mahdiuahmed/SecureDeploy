@@ -230,7 +230,7 @@ jobs:
           sed -i "s|IMAGE_URI|$ECR_IMAGE|g" k8s/deployment.yaml
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/networkpolicy.yaml
-          kubectl rollout status deployment/securedeploy --timeout=120s
+          kubectl rollout status deployment/securedeploy-app --timeout=120s
 
   # ════════════════════════════════════════
   # JOB 8: Notify on failure
