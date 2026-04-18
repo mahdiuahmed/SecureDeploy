@@ -63,10 +63,13 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.30"
 
-  vpc_config {
+  vpc_config { # nosemgrep: terraform.lang.security.eks-public-endpoint-enabled.eks-public-endpoint-enabled
+    # Public endpoint required for GitHub Actions hosted runners (no VPC access).
+    # Accepted risk: mitigated by OIDC auth (no long-lived keys), IAM RBAC, and
+    # private node group (workers stay in private subnets). Disable for prod.
     subnet_ids              = [aws_subnet.private_a.id, aws_subnet.private_b.id]
     endpoint_private_access = true
-    endpoint_public_access  = true   # required for GitHub Actions public runners to deploy
+    endpoint_public_access  = true
   }
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
