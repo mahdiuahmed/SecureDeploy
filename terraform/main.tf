@@ -251,7 +251,7 @@ resource "aws_iam_role" "github_actions" {
         }
         StringLike = {
           # IMPORTANT: change this to YOUR repo
-          "token.actions.githubusercontent.com:sub" = "repo:mahdiuahmed/securedeploy:*"
+          "token.actions.githubusercontent.com:sub" = "repo:mahdiuahmed/SecureDeploy:*"
         }
       }
     }]
